@@ -3,6 +3,8 @@ import { Object, Property } from "fabric-contract-api";
 @Object()
 export class CreateOrganizationDTO {
   @Property() name: string;
+  @Property() type: string;
+  @Property() level: string;
   @Property() parentId: string;
 }
 
@@ -11,6 +13,8 @@ export class Organization {
   @Property() docType: string;
   @Property() id: string;
   @Property() name: string;
+  @Property() type: string;
+  @Property() level: string;
   @Property() parentId: string;
   @Property() createdAt: string;
   @Property() updatedAt: string;
@@ -18,8 +22,8 @@ export class Organization {
 }
 
 @Object()
-export class OrganizationTree {
-  @Property() id: string;
-  @Property() name: string;
+export class OrganizationTree extends Organization {
+  @Property() path: string[];
+  @Property() hasChildTypeIsPosition?: boolean;
   @Property() children: OrganizationTree[];
 }

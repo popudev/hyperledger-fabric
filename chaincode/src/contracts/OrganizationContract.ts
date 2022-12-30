@@ -9,22 +9,15 @@ export class OrganizationContract extends BaseContract {
     super("ORGANIZATION");
   }
 
-  private getTreeRecursive(organizations: Organization[], parentId: string) {
-    /*
-    [{
-      docType: "ORGANIZATION"
-      id: 1,
-      name: "Ban Giam Doc",
-      parentId: "",
-    }]
-    */
+  private getTreeRecursive(organizations: Organization[], parentId: string, pathParent: any[] = []) {
     const children = organizations.filter((org) => org.parentId === parentId);
 
     const result: OrganizationTree[] = children.map((child) => {
+      const path = [...pathParent, child.name];
       return {
-        id: child.id,
-        name: child.name,
-        children: this.getTreeRecursive(organizations, child.id),
+        ...child,
+        path: path,
+        children: this.getTreeRecursive(organizations, child.id, path),
       };
     });
 
@@ -35,9 +28,42 @@ export class OrganizationContract extends BaseContract {
   @Returns("string")
   async getTree(ctx: Context) {
     const organizations = JSON.parse(await this.getAll(ctx));
-    const result = this.getTreeRecursive(organizations, "");
+    const orgsTypeOrg = organizations
+      .filter((org) => org.type === "ORGANIZATION")
+      .sort((a, b) => {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+
+    const orgsTypePos = organizations
+      .filter((org) => org.type === "POSITION")
+      .sort((a, b) => {
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      });
+    const result = this.getTreeRecursive([...orgsTypeOrg, ...orgsTypePos], "");
     return JSON.stringify(result);
   }
+
+  // private treeToPlane(root: OrganizationTree) {
+  //   const temp: any[] = [];
+  //   const { children, ...other } = root;
+  //   other.hasChildTypeIsPosition = false;
+
+  //   children.forEach((child: any) => {
+  //     if (child.type === "POSITION") other.hasChildTypeIsPosition = true;
+  //     temp.push(...this.treeToPlane(child));
+  //   });
+
+  //   return [other, ...temp];
+  // }
+
+  // @Transaction(false)
+  // @Returns("string")
+  // async getAll(ctx: Context) {
+  //   const tree = JSON.parse(await this.getTree(ctx));
+  //   const root = tree[0];
+  //   const records = this.treeToPlane(root);
+  //   return JSON.stringify(records);
+  // }
 
   @Transaction(false)
   @Returns("string")
@@ -66,7 +92,15 @@ export class OrganizationContract extends BaseContract {
       result = await iterator.next();
     }
 
-    return JSON.stringify(allResults);
+    const chilsOfChil = [];
+    for (const chil of allResults) {
+      if (chil.type === "ORGANIZATION") continue;
+      const chilsJson = await this.getChildren(ctx, chil.id);
+      const chils = JSON.parse(chilsJson);
+      chilsOfChil.push(...chils);
+    }
+
+    return JSON.stringify([...allResults, ...chilsOfChil]);
   }
 
   @Transaction()
@@ -85,7 +119,7 @@ export class OrganizationContract extends BaseContract {
     };
 
     if (!organization.parentId) {
-      const childrens = JSON.parse(await this.getChildren(ctx, organization.parentId));
+      const childrens = JSON.parse(await this.getChildren(ctx, ""));
       if (childrens.length) throw new Error(`Root organization already exists`);
     }
 
